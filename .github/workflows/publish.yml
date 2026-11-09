@@ -1,0 +1,59 @@
+name: Publish public CLI
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, for example 2.0.0-rc.1'
+        type: string
+        required: true
+      tag:
+        description: 'npm tag'
+        type: choice
+        options: [next, latest]
+        default: next
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: publish-public-cli
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Confirm publisher handover and version
+        env:
+          PUBLISH_ENABLED: ${{ vars.CWEB_PUBLIC_PUBLISH_ENABLED }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          node --input-type=module -e '
+            const { PUBLISH_ENABLED: enabled, RELEASE_VERSION: v, RELEASE_TAG: tag, GITHUB_REF: ref } = process.env;
+            if (enabled !== "true") throw new Error("Confirm old publisher is stopped before enabling public publishing");
+            if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(v)) throw new Error("Invalid release version");
+            if (tag === "latest" && (v.includes("-") || ref !== "refs/heads/main")) throw new Error("Stable releases require main and a stable version");
+            if (tag === "next" && !v.includes("-")) throw new Error("Use a prerelease version with next");
+          '
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm test
+      - name: Pack release
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          npm version "$RELEASE_VERSION" --no-git-tag-version
+          npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cweb-package
+          path: '*.tgz'
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: npm publish ./*.tgz --tag "$RELEASE_TAG" --access public

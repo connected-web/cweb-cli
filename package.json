@@ -1,0 +1,13 @@
+{
+  "name": "@connected-web/cweb",
+  "version": "0.0.0",
+  "description": "Connected Web public CLI: sign in and use app commands",
+  "type": "module",
+  "bin": { "cweb": "bin/cweb.mjs" },
+  "files": ["bin", "src", "README.md"],
+  "scripts": { "test": "node --test test/*.test.js", "check": "node scripts/check.js" },
+  "engines": { "node": ">=22" },
+  "repository": { "type": "git", "url": "git+https://github.com/connected-web/cweb-cli.git" },
+  "license": "UNLICENSED",
+  "publishConfig": { "registry": "https://registry.npmjs.org", "access": "public" }
+}
