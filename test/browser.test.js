@@ -21,11 +21,20 @@ test('switch-account clears browser SSO before starting a separate PKCE login', 
   let opened
   const pending = browserLogin({ oauthUrl: 'https://example.com', clientId: 'client', scopes: 'openid', switchAccount: true, port: 0, open: url => { opened = new URL(url) } })
   while (!opened) await new Promise(resolve => setTimeout(resolve, 5))
-  assert.equal(opened.pathname, '/logout')
-  const callback = new URL(opened.searchParams.get('redirect_uri')); callback.hostname = '127.0.0.1'
-  callback.search = new URLSearchParams({ code: 'discarded-code', state: opened.searchParams.get('state') })
-  const transition = await fetch(callback, { redirect: 'manual' })
+  assert.equal(opened.pathname, '/start-switch')
+  const localStart = new URL(opened); localStart.hostname = '127.0.0.1'
+  const begin = await fetch(localStart, { redirect: 'manual' })
+  assert.equal(begin.status, 302)
+  const logout = new URL(begin.headers.get('location'))
+  assert.equal(logout.pathname, '/logout')
+  assert.equal(logout.searchParams.has('response_type'), false)
+  assert.equal(logout.searchParams.has('redirect_uri'), false)
+  const cookie = begin.headers.get('set-cookie').split(';')[0]
+  const callback = new URL(logout.searchParams.get('logout_uri')); callback.hostname = '127.0.0.1'
+  assert.equal((await fetch(callback, { redirect: 'manual' })).status, 400)
+  const transition = await fetch(callback, { redirect: 'manual', headers: { cookie } })
   assert.equal(transition.status, 302)
+  assert.match(transition.headers.get('set-cookie'), /Max-Age=0/)
   const authorize = new URL(transition.headers.get('location'))
   assert.equal(authorize.pathname, '/oauth2/authorize')
   assert.notEqual(authorize.searchParams.get('state'), opened.searchParams.get('state'))

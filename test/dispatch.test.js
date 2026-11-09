@@ -87,3 +87,21 @@ test('cancellation reaches the plugin and returns a signal exit code', { skip: p
   assert.equal(await done, 0)
   assert.ok(fs.existsSync(stopped), 'plugin did not receive cancellation')
 })
+
+test('only named catalogue entries can be installed or dispatched', async t => {
+  const f = fixture(t)
+  for (const command of [['constructor'], ['install', '__proto__']]) {
+    const result = await f.exec(command)
+    assert.equal(result.code, 1)
+    assert.match(result.stderr, /Unknown/)
+  }
+})
+test('a plugin pointing to core fails instead of recursively invoking itself', { skip: process.platform === 'win32' }, async t => {
+  const f = fixture(t); const bin = path.join(f.home, 'bin')
+  fs.mkdirSync(bin)
+  fs.symlinkSync(path.join(root, 'bin/cweb.mjs'), path.join(bin, 'cweb-tasks'))
+  f.env.PATH = bin + path.delimiter + f.env.PATH
+  const result = await f.exec(['tasks', 'list'])
+  assert.equal(result.code, 1)
+  assert.match(result.stderr, /points back to cweb/)
+})

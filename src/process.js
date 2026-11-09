@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 export function findExecutable (name) {
   const extensions = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : ['']
@@ -23,6 +24,13 @@ export function nodeShim (file, packageName, binName) {
   const target = path.resolve(root, bin)
   if (!target.startsWith(root + path.sep)) throw new Error('Package executable is outside its package directory.')
   return { file: process.execPath, prefix: [target] }
+}
+export function assertNotCore (command) {
+  const executable = command.prefix[0] || command.file
+  const core = fileURLToPath(new URL('../bin/cweb.mjs', import.meta.url))
+  if (fs.realpathSync(executable) === fs.realpathSync(core)) {
+    throw new Error('The app executable points back to cweb. Reinstall the app CLI.')
+  }
 }
 export function npmCommand () {
   const npm = findExecutable('npm')
