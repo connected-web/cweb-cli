@@ -71,7 +71,8 @@ export async function identity (profile, token) {
           const data = await response.json()
           if (data.sub === claims.sub) {
             user = { sub: data.sub, email: data.email || null, name: data.name || null }
-            saveSession(profile, { ...loadSession(profile), user })
+            // Identity lookup is read-only. Login caches ID-token attributes;
+            // a slow userInfo lookup must not overwrite a newly refreshed session.
           }
         }
       } catch { /* Identity lookup is optional; the subject remains visible. */ }

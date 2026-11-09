@@ -74,7 +74,7 @@ test('cancellation reaches the plugin and returns a signal exit code', { skip: p
   const f = fixture(t); const bin = path.join(f.home, 'bin')
   const ready = path.join(f.home, 'ready')
   const stopped = path.join(f.home, 'stopped')
-  executable(bin, 'cweb-tasks', '@connected-web/cweb-tasks', `const fs = require('node:fs');fs.writeFileSync(process.env.TEST_READY, 'ready');process.on('SIGTERM',()=>{fs.writeFileSync(process.env.TEST_STOPPED,'stopped');process.exit(0)});setInterval(()=>{},1000)`)
+  executable(bin, 'cweb-tasks', '@connected-web/cweb-tasks', `const fs = require('node:fs');process.on('SIGTERM',()=>{fs.writeFileSync(process.env.TEST_STOPPED,'stopped');process.exit(0)});fs.writeFileSync(process.env.TEST_READY, 'ready');setInterval(()=>{},1000)`)
   f.env.PATH = bin + path.delimiter + f.env.PATH
   f.env.TEST_READY = ready; f.env.TEST_STOPPED = stopped
   const { spawn } = await import('node:child_process')
