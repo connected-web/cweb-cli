@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import path from 'node:path'
 import fs from 'node:fs'
-import { fixture, executable, session, jwt } from './helpers.js'
+import { fixture, executable, session, jwt, run, root } from './helpers.js'
 import { commandLine } from '../src/cli.js'
 import { curlArguments } from '../src/curl.js'
 
@@ -68,4 +68,22 @@ test('prefix parsing and curl profile selection preserve the caller identity', (
   assert.equal(commandLine(['-p', 'org', '--machine', 'curl']).engineering, true)
   assert.equal(commandLine(['-p', 'global', 'tasks', '--help']).command, 'tasks')
   assert.deepEqual(curlArguments(['-p', 'chosen', '--user', '-sS', 'https://example.com'], 'initial'), { profile: 'chosen', forwarded: ['-sS', 'https://example.com'] })
+})
+
+test('cancellation reaches the plugin and returns a signal exit code', { skip: process.platform === 'win32' }, async t => {
+  const f = fixture(t); const bin = path.join(f.home, 'bin')
+  const ready = path.join(f.home, 'ready')
+  const stopped = path.join(f.home, 'stopped')
+  executable(bin, 'cweb-tasks', '@connected-web/cweb-tasks', `const fs = require('node:fs');process.on('SIGTERM',()=>{fs.writeFileSync(process.env.TEST_STOPPED,'stopped');process.exit(0)});fs.writeFileSync(process.env.TEST_READY, 'ready');setInterval(()=>{},1000)`)
+  f.env.PATH = bin + path.delimiter + f.env.PATH
+  f.env.TEST_READY = ready; f.env.TEST_STOPPED = stopped
+  const { spawn } = await import('node:child_process')
+  const child = spawn(process.execPath, [path.join(root, 'bin/cweb.mjs'), 'tasks', 'list'], { env: f.env, stdio: 'pipe' })
+  const done = new Promise(resolve => child.on('close', code => resolve(code)))
+  t.after(() => { if (child.exitCode === null) child.kill('SIGKILL') })
+  for (let i = 0; i < 200 && !fs.existsSync(ready); i++) await new Promise(resolve => setTimeout(resolve, 10))
+  assert.ok(fs.existsSync(ready), 'plugin did not start')
+  child.kill('SIGTERM')
+  assert.equal(await done, 0)
+  assert.ok(fs.existsSync(stopped), 'plugin did not receive cancellation')
 })

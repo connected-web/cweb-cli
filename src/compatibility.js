@@ -9,7 +9,7 @@ export function isEngineeringCall (command, args) {
 export async function forwardEngineering (args) {
   process.stderr.write('This engineering command has moved to cweb-eng. Update your command before the next public major release.\n')
   const file = findExecutable('cweb-eng')
-  if (!file) throw new Error('Install the engineering CLI: npm install -g @connected-web/cweb-eng --registry=https://npm.pkg.github.com')
+  if (!file) throw new Error('Install the engineering CLI: npm install -g @connected-web/cweb-eng --@connected-web:registry=https://npm.pkg.github.com')
   const target = nodeShim(file, '@connected-web/cweb-eng', 'cweb-eng')
   return (await runProcess(target.file, [...target.prefix, ...args])).code
 }

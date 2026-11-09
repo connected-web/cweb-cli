@@ -22,7 +22,7 @@ test('clean Global settings, legacy cache, refresh and identity display use the 
       let body = ''; for await (const chunk of req) body += chunk
       assert.equal(new URLSearchParams(body).get('refresh_token'), 'existing-refresh')
       refreshes++
-      res.end(JSON.stringify({ access_token: jwt({ iss: base + '/pool', client_id: 'global-client' }), refresh_token: 'rotated-refresh' }))
+      res.end(JSON.stringify({ access_token: jwt({ iss: base + '/pool', client_id: 'global-client' }), refresh_token: 'rotated-refresh', id_token: jwt({ email: 'codex@example.test', name: 'Codex User' }) }))
     } else if (req.url === '/oauth2/userInfo') {
       assert.match(req.headers.authorization, /^Bearer /)
       res.end(JSON.stringify({ sub: 'user-one', email: 'codex@example.test', name: 'Codex User' }))
@@ -72,4 +72,18 @@ test('public curl selects the explicit profile and forwards data without corrupt
   const result = await f.exec(['-p', 'wrong', 'curl', '--user', '-p', 'chosen', '-sS', '-X', 'POST', '--data', body, base])
   assert.equal(result.code, 0, result.stderr)
   assert.deepEqual(JSON.parse(result.stdout), { body })
+})
+
+test('whoami resolves an email for an existing access-token-only profile', async t => {
+  const f = fixture(t)
+  const base = await server(t, (req, res) => {
+    assert.equal(req.url, '/oauth2/userInfo')
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ sub: 'user-one', email: 'legacy@example.test' }))
+  })
+  fs.writeFileSync(path.join(f.accounts, 'legacy.json'), JSON.stringify({ environment: 'global', identity: { oauthUrl: base, clientId: 'client' } }))
+  session(f.home, 'legacy', { token: { access: jwt(), expiresAt: Math.floor(Date.now() / 1000) + 3600 } })
+  const result = await f.exec(['whoami', '-p', 'legacy', '--json'])
+  assert.equal(result.code, 0, result.stderr)
+  assert.equal(JSON.parse(result.stdout).user.email, 'legacy@example.test')
 })

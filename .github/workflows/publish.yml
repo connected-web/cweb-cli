@@ -14,18 +14,22 @@ on:
         required: true
 permissions:
   contents: read
+  id-token: write
 concurrency:
   group: publish-public-cli
   cancel-in-progress: false
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: public
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
       - name: Confirm publisher handover and version
         env:
           PUBLISH_ENABLED: ${{ vars.CWEB_PUBLIC_PUBLISH_ENABLED }}
@@ -54,6 +58,5 @@ jobs:
           path: '*.tgz'
       - name: Publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: npm publish ./*.tgz --tag "$RELEASE_TAG" --access public
+        run: npm publish ./*.tgz --tag "$RELEASE_TAG" --access public --provenance

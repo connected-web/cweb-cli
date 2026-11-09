@@ -5,8 +5,9 @@
       organisation credentials, including transitive dependencies.
 - [ ] Stop both release and PR publishers for @connected-web/cweb in the platform
       repository. Keep cweb-eng publishing independent.
-- [ ] Confirm npm package ownership and configure NPM_TOKEN for this repository.
-      Only then enable the repository variable CWEB_PUBLIC_PUBLISH_ENABLED.
+- [ ] Confirm npm package ownership and configure npm trusted publishing for
+      owner `connected-web`, repository `cweb-cli`, workflow `publish.yml`,
+      environment `public`. Only then enable CWEB_PUBLIC_PUBLISH_ENABLED.
 - [ ] Publish the public major-version candidate under next.
 - [ ] Install the candidate with a clean home. Sign in, switch accounts, discover
       workspaces and exercise Membership, Tasks, Files and Notes in disposable data.
