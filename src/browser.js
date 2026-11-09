@@ -23,24 +23,36 @@ export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = fals
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')
   return new Promise((resolve, reject) => {
     let stage = switchAccount ? 'logout' : 'login'
-    let timer; let redirectUri; let authorize
+    let timer; let redirectUri; let authorize; let logout
+    const cookieName = `cweb-switch-${logoutState.slice(0, 12)}`
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, 'http://localhost')
+      if (stage === 'logout' && url.pathname === '/start-switch') {
+        if (url.searchParams.get('state') !== logoutState) { res.writeHead(400).end('Invalid account-switch state.'); return }
+        res.writeHead(302, {
+          location: logout.toString(),
+          'set-cookie': `${cookieName}=${logoutState}; Path=/; HttpOnly; SameSite=Lax; Max-Age=180`
+        }).end()
+        return
+      }
       if (url.pathname !== '/') { res.writeHead(404).end(); return }
-      const expected = stage === 'logout' ? logoutState : state
-      if (url.searchParams.get('state') !== expected) { res.writeHead(400).end('Invalid sign-in state.'); return }
+      if (stage === 'logout') {
+        const cookies = (req.headers.cookie || '').split(';').map(value => value.trim())
+        if (!cookies.includes(`${cookieName}=${logoutState}`)) { res.writeHead(400).end('Invalid account-switch state.'); return }
+        stage = 'login'
+        res.writeHead(302, {
+          location: authorize.toString(),
+          'set-cookie': `${cookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+        }).end()
+        return
+      }
+      if (url.searchParams.get('state') !== state) { res.writeHead(400).end('Invalid sign-in state.'); return }
       if (url.searchParams.has('error')) {
         res.writeHead(400).end('Sign-in was not completed.')
         finish(new Error(`Sign-in failed: ${url.searchParams.get('error')}`)); return
       }
       const code = url.searchParams.get('code')
       if (!code) { res.writeHead(400).end('Missing sign-in code.'); return }
-      if (stage === 'logout') {
-        // Cognito supports redirect_uri on /logout even when the client has no
-        // loopback LogoutURL. Discard that flow's code, then start our PKCE flow.
-        stage = 'login'
-        res.writeHead(302, { location: authorize.toString() }).end(); return
-      }
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end('<!doctype html><title>Connected Web</title><h1>Signed in</h1><p>You can return to your terminal and close this tab.</p>')
       finish(null, { code, verifier, redirectUri })
     })
@@ -55,10 +67,14 @@ export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = fals
       authorize.search = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: scopes, state, code_challenge_method: 'S256', code_challenge: challenge }).toString()
       let start = authorize
       if (switchAccount) {
-        start = new URL('/logout', oauthUrl)
-        start.search = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, response_type: 'code', scope: scopes, state: logoutState }).toString()
+        logout = new URL('/logout', oauthUrl)
+        logout.search = new URLSearchParams({ client_id: clientId, logout_uri: redirectUri }).toString()
+        // Bind the logout return to this browser with a short-lived local cookie.
+        // Logout issues no authorization code; only the following PKCE flow does.
+        start = new URL('/start-switch', redirectUri)
+        start.search = new URLSearchParams({ state: logoutState }).toString()
       }
-      timer = setTimeout(() => finish(new Error('Timed out waiting for sign-in. Run cweb login again.')), timeout)
+      timer = setTimeout(() => finish(new Error(`Timed out waiting for sign-in. Check that ${redirectUri} is an allowed callback${switchAccount ? ' and sign-out URL' : ''}, then run cweb login again.`)), timeout)
       process.stderr.write(`Opening ${switchAccount ? 'account switch' : 'sign-in'} in your browser.\n`)
       try { open(start.toString()) } catch (error) { finish(error) }
     })

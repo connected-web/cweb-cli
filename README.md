@@ -47,9 +47,10 @@ Ordinary `cweb logout` clears only the local user session. Federated providers m
 have their own session; choose the intended account there too.
 
 The browser callback uses `http://localhost:12025/`. That address must be an
-allowed callback for the sign-in client. `--port` supports another registered
-loopback port. The switch flow uses Cognito's logout-to-login redirect, then a
-separate PKCE exchange, so it does not require a new sign-out callback URL.
+allowed callback and sign-out URL for account switching. Managed Connected Web
+clients register both. `--port` supports another registered
+loopback port. The switch flow returns from Cognito logout before starting a PKCE sign-in.
+A short-lived localhost cookie keeps the logout return in the same browser.
 
 ## App commands
 
