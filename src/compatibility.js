@@ -1,4 +1,4 @@
-import { findExecutable, nodeShim, runProcess } from './process.js'
+import { findExecutable, nodeShim, runProcess, assertNotCore } from './process.js'
 
 const engineeringCommands = new Set(['configure', 'sync-accounts', 'repo', 'platform-bootstrap', 'credentials', 'package', 'deployments', 'provisioning', 'release', 'services', 'logs'])
 export function isEngineeringCall (command, args) {
@@ -11,5 +11,6 @@ export async function forwardEngineering (args) {
   const file = findExecutable('cweb-eng')
   if (!file) throw new Error('Install the engineering CLI: npm install -g @connected-web/cweb-eng --@connected-web:registry=https://npm.pkg.github.com')
   const target = nodeShim(file, '@connected-web/cweb-eng', 'cweb-eng')
+  assertNotCore(target)
   return (await runProcess(target.file, [...target.prefix, ...args])).code
 }

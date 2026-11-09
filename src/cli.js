@@ -63,7 +63,7 @@ function coreOptions (args) {
 export async function run (argv) {
   const parsed = commandLine(argv)
   if (parsed.engineering || isEngineeringCall(parsed.command, parsed.args)) return forwardEngineering(argv)
-  if (plugins[parsed.command]) return runPlugin(parsed.command, parsed.args, parsed.profile ? profileName(parsed.profile) : undefined, parsed.environment)
+  if (Object.hasOwn(plugins, parsed.command)) return runPlugin(parsed.command, parsed.args, parsed.profile ? profileName(parsed.profile) : undefined, parsed.environment)
   if (parsed.command === 'curl') return curl(parsed.args, profileName(parsed.profile), { environment: parsed.environment })
   if (['help', '--help', '-h'].includes(parsed.command) || parsed.args.includes('--help') || parsed.args.includes('-h')) { process.stdout.write(help); return 0 }
   if (['version', '--version', '-v'].includes(parsed.command)) { process.stdout.write(version + '\n'); return 0 }

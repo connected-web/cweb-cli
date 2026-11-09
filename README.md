@@ -9,7 +9,7 @@ normal app commands.
 ## Install and sign in
 
 ```sh
-npm install -g @connected-web/cweb --registry=https://registry.npmjs.org --@connected-web:registry=https://registry.npmjs.org
+npm install -g @connected-web/cweb@next --registry=https://registry.npmjs.org --@connected-web:registry=https://registry.npmjs.org
 cweb login --interactive
 cweb whoami
 cweb install tasks
@@ -17,8 +17,8 @@ cweb tasks workspaces
 cweb tasks list personal/default --json
 ```
 
-Public releases from this repository are not published yet. Until the publisher
-handover is complete, installing the existing package does not install this code.
+The current public release is a candidate under `next`. App packages are being
+prepared for npmjs.org; check their availability before relying on `cweb install`.
 
 New profiles use Global's deployed sign-in configuration. Use a separate profile
 for development:

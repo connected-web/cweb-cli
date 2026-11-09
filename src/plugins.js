@@ -1,6 +1,6 @@
 import { loadSession, identity } from './auth.js'
 import { profileName } from './profiles.js'
-import { findExecutable, nodeShim, npmCommand, runProcess } from './process.js'
+import { findExecutable, nodeShim, npmCommand, runProcess, assertNotCore } from './process.js'
 
 export const plugins = Object.freeze({
   membership: '@connected-web/cweb-membership', tasks: '@connected-web/cweb-tasks',
@@ -8,11 +8,13 @@ export const plugins = Object.freeze({
   pages: '@connected-web/cweb-pages', comments: '@connected-web/cweb-comments', support: '@connected-web/cweb-support'
 })
 export async function runPlugin (name, args, profile, environment) {
+  if (!Object.hasOwn(plugins, name)) throw new Error(`Unknown app command: ${name}. Run cweb plugins to see available commands.`)
   const packageName = plugins[name]
   if (!packageName) throw new Error(`Unknown app command: ${name}. Run cweb plugins to see available commands.`)
   const executable = findExecutable(`cweb-${name}`)
   if (!executable) throw new Error(`${name} is not installed. Run: cweb install ${name}`)
   const command = nodeShim(executable, packageName, `cweb-${name}`)
+  assertNotCore(command)
   // Put the core selection first so a plugin's explicit profile wins.
   const result = await runProcess(command.file, [...command.prefix, ...(profile ? ['--profile', profile] : []), ...(environment ? ['--environment', environment] : []), ...args], { observeStderr: true })
   if (result.code && /No authorised workspace matches|No project in .* matches/.test(result.stderr)) {
@@ -33,7 +35,7 @@ export async function installPackage (packageName) {
   return (await runProcess(npm.file, [...npm.prefix, 'install', '--global', `${packageName}@latest`, '--registry=https://registry.npmjs.org', '--@connected-web:registry=https://registry.npmjs.org'])).code
 }
 export async function installPlugin (name) {
-  if (!plugins[name]) throw new Error(`Unknown app: ${name}. Run cweb plugins to see available commands.`)
+  if (!Object.hasOwn(plugins, name)) throw new Error(`Unknown app: ${name}. Run cweb plugins to see available commands.`)
   return installPackage(plugins[name])
 }
 export function listPlugins (json) {
