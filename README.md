@@ -118,7 +118,8 @@ on the supported Node LTS versions and operating systems.
 
 Versions remain `0.0.0` in source. Publishing requires the platform repository to
 stop publishing `@connected-web/cweb` first. The manual release workflow also
-requires `CWEB_PUBLIC_PUBLISH_ENABLED=true` and the `NPM_TOKEN` publishing secret.
+requires `CWEB_PUBLIC_PUBLISH_ENABLED=true` and npm trusted publishing for `connected-web/cweb-cli`, workflow `publish.yml`,
+environment `public`. No npm token secret is used.
 Start with an explicit prerelease and the `next` tag. Stable releases use `main`.
 No infrastructure is deployed. See [the rollout checklist](docs/rollout.md).
 
