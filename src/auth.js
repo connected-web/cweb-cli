@@ -95,7 +95,7 @@ export async function whoami (profile, { json = false, environment } = {}) {
   else process.stdout.write(`Profile: ${profile}\nEnvironment: ${result.environment}\nSigned in as: ${user.email || user.sub || 'not signed in'}${user.name ? ` (${user.name})` : ''}\nSubject: ${user.sub || 'none'}\nIssuer: ${user.issuer || 'none'}\n`)
   return result
 }
-export async function login (profile, options = {}) {
+export async function login (profile, options = {}, authenticate = browserLogin) {
   const config = await ensureProfile(profile, options.environment)
   if (!options.interactive && !options['switch-account']) {
     try {
@@ -106,10 +106,28 @@ export async function login (profile, options = {}) {
       if (!process.stdin.isTTY) throw error
     }
   }
-  if (options['switch-account']) removeUserSession(profile)
-  const result = await browserLogin({ oauthUrl: config.identity.oauthUrl, clientId: config.identity.clientId, scopes: config.identity.scopes || 'openid email profile', switchAccount: Boolean(options['switch-account']), port: options.port ? Number(options.port) : 12025 })
-  const data = await tokenRequest(config, { grant_type: 'authorization_code', client_id: config.identity.clientId, code: result.code, code_verifier: result.verifier, redirect_uri: result.redirectUri })
-  storeTokens(profile, data)
-  if (options['get-access-token']) { process.stdout.write(data.access_token); return }
+  const switching = Boolean(options['switch-account'])
+  const previous = switching ? loadSession(profile) : undefined
+  const previousSubject = decodeJwtPayload(previous?.token?.access || '').sub || previous?.user?.sub
+  const token = await authenticate({
+    oauthUrl: config.identity.oauthUrl,
+    clientId: config.identity.clientId,
+    scopes: config.identity.scopes || 'openid email profile',
+    switchAccount: switching,
+    noBrowser: options['no-browser'],
+    port: options.port ? Number(options.port) : 12025,
+    complete: async ({ code, verifier, redirectUri }) => {
+      const data = await tokenRequest(config, { grant_type: 'authorization_code', client_id: config.identity.clientId, code, code_verifier: verifier, redirect_uri: redirectUri })
+      if (switching && previousSubject && decodeJwtPayload(data.access_token).sub === previousSubject) {
+        throw new Error('The browser signed in to the same account. Retry with --switch-account --no-browser and open the link in a fresh private window.')
+      }
+      const session = loadSession(profile)
+      if (switching) {
+        delete session.token; delete session.refresh; delete session.user
+      }
+      return storeTokens(profile, data, session)
+    }
+  })
+  if (options['get-access-token']) { process.stdout.write(token); return }
   return whoami(profile, options)
 }

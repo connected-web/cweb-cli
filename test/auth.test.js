@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import fs from 'node:fs'
 import path from 'node:path'
 import http from 'node:http'
-import { fixture, jwt, session } from './helpers.js'
+import { fixture, jwt, run, session } from './helpers.js'
 
 async function server (t, handler) {
   const server = http.createServer(handler)
@@ -86,4 +86,33 @@ test('whoami resolves an email for an existing access-token-only profile', async
   const result = await f.exec(['whoami', '-p', 'legacy', '--json'])
   assert.equal(result.code, 0, result.stderr)
   assert.equal(JSON.parse(result.stdout).user.email, 'legacy@example.test')
+})
+
+test('account switching rejects the same subject and preserves the old session until a different sign-in succeeds', async t => {
+  const f = fixture(t)
+  const base = await server(t, async (req, res) => {
+    assert.equal(req.url, '/oauth2/token')
+    let body = ''
+    for await (const chunk of req) body += chunk
+    const sub = new URLSearchParams(body).get('code')
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ access_token: jwt({ sub }), id_token: jwt({ sub, email: 'account@example.test' }) }))
+  })
+  fs.writeFileSync(path.join(f.accounts, 'switch.json'), JSON.stringify({ environment: 'global', identity: { oauthUrl: base, clientId: 'client' } }))
+  session(f.home, 'switch', { token: { access: jwt() }, refresh: { token: 'old-refresh' }, machine: { clientId: 'engineering-id' } })
+  const result = await run(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict'
+    import { loadSession, login } from ${JSON.stringify(new URL('../src/auth.js', import.meta.url).href)}
+    const switchTo = code => login('switch', { 'switch-account': true, json: true }, async ({ complete }) => complete({
+      code, verifier: 'fixture-verifier', redirectUri: 'http://localhost:12025/'
+    }))
+    await assert.rejects(switchTo('user-one'), /fresh private window/)
+    assert.equal(loadSession('switch').refresh.token, 'old-refresh')
+    await switchTo('user-two')
+    const current = loadSession('switch')
+    assert.equal(current.user.sub, 'user-two')
+    assert.equal(current.refresh.token, '')
+    assert.equal(current.machine.clientId, 'engineering-id')
+  `], { env: f.env, cwd: f.home })
+  assert.equal(result.code, 0, result.stderr)
 })
