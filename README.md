@@ -42,7 +42,8 @@ cweb whoami
 ```
 
 This signs out the browser's Cognito session before asking you to sign in again.
-It replaces the selected CLI user session and preserves engineering credentials.
+Choose a different account in the browser. The CLI keeps its current session
+until a different sign-in succeeds and preserves engineering credentials.
 Ordinary `cweb logout` clears only the local user session. Federated providers may
 have their own session; choose the intended account there too.
 

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import crypto from 'node:crypto'
+import { once } from 'node:events'
+import net from 'node:net'
 import { browserLogin } from '../src/browser.js'
 
-test('browser sign-in rejects a wrong state and returns the PKCE code', async () => {
+test('browser sign-in rejects a wrong state, serves the styled page and closes preconnections', async t => {
   let opened
   const pending = browserLogin({ oauthUrl: 'https://example.com', clientId: 'client', scopes: 'openid email', port: 0, open: url => { opened = new URL(url) } })
   while (!opened) await new Promise(resolve => setTimeout(resolve, 5))
@@ -11,8 +13,18 @@ test('browser sign-in rejects a wrong state and returns the PKCE code', async ()
   redirect.hostname = '127.0.0.1'
   redirect.search = new URLSearchParams({ code: 'bad', state: 'wrong' })
   assert.equal((await fetch(redirect)).status, 400)
+  const preconnection = net.createConnection({ host: redirect.hostname, port: Number(redirect.port) })
+  t.after(() => preconnection.destroy())
+  await once(preconnection, 'connect')
+  const closed = once(preconnection, 'close', { signal: AbortSignal.timeout(3000) })
   redirect.search = new URLSearchParams({ code: 'good', state: opened.searchParams.get('state') })
-  assert.equal((await fetch(redirect)).status, 200)
+  const response = await fetch(redirect)
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  const page = await response.text()
+  assert.match(page, /<style>/)
+  assert.match(page, /Connected Web login complete/)
+  await closed
   const result = await pending
   assert.equal(result.code, 'good')
   assert.equal(crypto.createHash('sha256').update(result.verifier).digest('base64url'), opened.searchParams.get('code_challenge'))
@@ -37,6 +49,7 @@ test('switch-account clears browser SSO before starting a separate PKCE login', 
   assert.match(transition.headers.get('set-cookie'), /Max-Age=0/)
   const authorize = new URL(transition.headers.get('location'))
   assert.equal(authorize.pathname, '/oauth2/authorize')
+  assert.equal(authorize.searchParams.get('prompt'), 'login')
   assert.notEqual(authorize.searchParams.get('state'), opened.searchParams.get('state'))
   assert.ok(authorize.searchParams.get('code_challenge'))
   callback.search = new URLSearchParams({ code: 'real-code', state: authorize.searchParams.get('state') })

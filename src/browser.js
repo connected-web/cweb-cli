@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import http from 'node:http'
 import fs from 'node:fs'
 import { spawn } from 'node:child_process'
+import { loginSuccessPage } from './browser-page.js'
 
 export function openBrowser (url) {
   let wsl = false
@@ -27,6 +28,7 @@ export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = fals
     const cookieName = `cweb-switch-${logoutState.slice(0, 12)}`
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, 'http://localhost')
+      if (stage === 'complete') { res.writeHead(410).end(); return }
       if (stage === 'logout' && url.pathname === '/start-switch') {
         if (url.searchParams.get('state') !== logoutState) { res.writeHead(400).end('Invalid account-switch state.'); return }
         res.writeHead(302, {
@@ -48,16 +50,25 @@ export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = fals
       }
       if (url.searchParams.get('state') !== state) { res.writeHead(400).end('Invalid sign-in state.'); return }
       if (url.searchParams.has('error')) {
-        res.writeHead(400).end('Sign-in was not completed.')
-        finish(new Error(`Sign-in failed: ${url.searchParams.get('error')}`)); return
+        stage = 'complete'
+        const error = new Error(`Sign-in failed: ${url.searchParams.get('error')}`)
+        res.writeHead(400, { connection: 'close' }).end('Sign-in was not completed.', () => finish(error))
+        return
       }
       const code = url.searchParams.get('code')
       if (!code) { res.writeHead(400).end('Missing sign-in code.'); return }
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end('<!doctype html><title>Connected Web</title><h1>Signed in</h1><p>You can return to your terminal and close this tab.</p>')
-      finish(null, { code, verifier, redirectUri })
+      stage = 'complete'
+      res.writeHead(200, {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-store',
+        'referrer-policy': 'no-referrer',
+        connection: 'close'
+      }).end(loginSuccessPage, () => finish(null, { code, verifier, redirectUri }))
     })
     function finish (error, result) {
       clearTimeout(timer); server.close()
+      // A browser preconnection with no request can outlive server.close().
+      server.closeAllConnections()
       if (error) reject(error); else resolve(result)
     }
     server.on('error', error => finish(new Error(`Cannot listen for sign-in: ${error.message}`)))
@@ -67,6 +78,7 @@ export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = fals
       authorize.search = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: scopes, state, code_challenge_method: 'S256', code_challenge: challenge }).toString()
       let start = authorize
       if (switchAccount) {
+        authorize.searchParams.set('prompt', 'login')
         logout = new URL('/logout', oauthUrl)
         logout.search = new URLSearchParams({ client_id: clientId, logout_uri: redirectUri }).toString()
         // Bind the logout return to this browser with a short-lived local cookie.
