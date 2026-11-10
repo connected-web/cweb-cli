@@ -108,19 +108,26 @@ export async function login (profile, options = {}, authenticate = browserLogin)
   }
   const switching = Boolean(options['switch-account'])
   const previous = switching ? loadSession(profile) : undefined
-  const previousSubject = previous?.user?.sub || decodeJwtPayload(previous?.token?.access || '').sub
-  const result = await authenticate({ oauthUrl: config.identity.oauthUrl, clientId: config.identity.clientId, scopes: config.identity.scopes || 'openid email profile', switchAccount: switching, port: options.port ? Number(options.port) : 12025 })
-  const data = await tokenRequest(config, { grant_type: 'authorization_code', client_id: config.identity.clientId, code: result.code, code_verifier: result.verifier, redirect_uri: result.redirectUri })
-  if (switching) {
-    if (previousSubject && decodeJwtPayload(data.access_token).sub === previousSubject) {
-      throw new Error('The browser signed in to the same account. Run cweb login --switch-account again and choose a different account in the browser.')
+  const previousSubject = decodeJwtPayload(previous?.token?.access || '').sub || previous?.user?.sub
+  const token = await authenticate({
+    oauthUrl: config.identity.oauthUrl,
+    clientId: config.identity.clientId,
+    scopes: config.identity.scopes || 'openid email profile',
+    switchAccount: switching,
+    noBrowser: options['no-browser'],
+    port: options.port ? Number(options.port) : 12025,
+    complete: async ({ code, verifier, redirectUri }) => {
+      const data = await tokenRequest(config, { grant_type: 'authorization_code', client_id: config.identity.clientId, code, code_verifier: verifier, redirect_uri: redirectUri })
+      if (switching && previousSubject && decodeJwtPayload(data.access_token).sub === previousSubject) {
+        throw new Error('The browser signed in to the same account. Retry with --switch-account --no-browser and open the link in a fresh private window.')
+      }
+      const session = loadSession(profile)
+      if (switching) {
+        delete session.token; delete session.refresh; delete session.user
+      }
+      return storeTokens(profile, data, session)
     }
-    const session = loadSession(profile)
-    delete session.token; delete session.refresh; delete session.user
-    storeTokens(profile, data, session)
-  } else {
-    storeTokens(profile, data)
-  }
-  if (options['get-access-token']) { process.stdout.write(data.access_token); return }
+  })
+  if (options['get-access-token']) { process.stdout.write(token); return }
   return whoami(profile, options)
 }

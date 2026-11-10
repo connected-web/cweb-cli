@@ -1,9 +1,14 @@
-export const loginSuccessPage = `<!doctype html>
+export function loginPage (successful) {
+  const title = successful ? 'Connected Web login complete' : 'Connected Web login not completed'
+  const message = successful
+    ? 'Your authentication was successful. You can return to your terminal.'
+    : 'Return to your terminal for details and to try again.'
+  return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Connected Web Login Complete</title>
+    <title>${title}</title>
     <style>
       :root {
         --cw-blue-900: #0b2f6b;
@@ -77,10 +82,11 @@ export const loginSuccessPage = `<!doctype html>
     <main class="card">
       <div class="brand">
         <div class="mark">CW</div>
-        <h1>Connected Web login complete</h1>
+        <h1>${title}</h1>
       </div>
-      <p>Your authentication was successful. You can return to your terminal.</p>
+      <p>${message}</p>
       <p class="status">It is now safe to close this browser tab.</p>
     </main>
   </body>
 </html>`
+}

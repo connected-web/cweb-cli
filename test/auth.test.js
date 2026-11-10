@@ -103,10 +103,10 @@ test('account switching rejects the same subject and preserves the old session u
   const result = await run(process.execPath, ['--input-type=module', '-e', `
     import assert from 'node:assert/strict'
     import { loadSession, login } from ${JSON.stringify(new URL('../src/auth.js', import.meta.url).href)}
-    const switchTo = code => login('switch', { 'switch-account': true, json: true }, async () => ({
+    const switchTo = code => login('switch', { 'switch-account': true, json: true }, async ({ complete }) => complete({
       code, verifier: 'fixture-verifier', redirectUri: 'http://localhost:12025/'
     }))
-    await assert.rejects(switchTo('user-one'), /choose a different account/)
+    await assert.rejects(switchTo('user-one'), /fresh private window/)
     assert.equal(loadSession('switch').refresh.token, 'old-refresh')
     await switchTo('user-two')
     const current = loadSession('switch')

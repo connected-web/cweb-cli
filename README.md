@@ -47,6 +47,11 @@ until a different sign-in succeeds and preserves engineering credentials.
 Ordinary `cweb logout` clears only the local user session. Federated providers may
 have their own session; choose the intended account there too.
 
+If your browser keeps signing in to the same account, run
+`cweb login --switch-account --no-browser`. Open the printed link in a fresh
+private window and complete the whole sign-in in that window. The link is for
+the current sign-in attempt.
+
 The browser callback uses `http://localhost:12025/`. That address must be an
 allowed callback and sign-out URL for account switching. Managed Connected Web
 clients register both. `--port` supports another registered

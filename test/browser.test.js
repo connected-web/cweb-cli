@@ -59,3 +59,34 @@ test('switch-account clears browser SSO before starting a separate PKCE login', 
 test('a failed sign-in closes the callback listener', async () => {
   await assert.rejects(browserLogin({ oauthUrl: 'https://example.com', clientId: 'client', scopes: 'openid', port: 0, timeout: 20, open: () => {} }), /Timed out/)
 })
+
+test('manual browser sign-in prints a link and shows failure when the CLI rejects the result', async t => {
+  let output = ''
+  let launched = false
+  const stderr = t.mock.method(process.stderr, 'write', message => { output += message; return true })
+  const pending = browserLogin({
+    oauthUrl: 'https://example.com',
+    clientId: 'client',
+    scopes: 'openid',
+    noBrowser: true,
+    port: 0,
+    timeout: 3000,
+    open: () => { launched = true },
+    complete: async () => { throw new Error('same account') }
+  })
+  const rejected = assert.rejects(pending, /same account/)
+  while (!output && !launched) await new Promise(resolve => setTimeout(resolve, 5))
+  stderr.mock.restore()
+  assert.equal(launched, false)
+  assert.match(output, /fresh private browser window/)
+  const start = new URL(output.trim().split('\n').at(-1))
+  const callback = new URL(start.searchParams.get('redirect_uri'))
+  callback.hostname = '127.0.0.1'
+  callback.search = new URLSearchParams({ code: 'real-code', state: start.searchParams.get('state') })
+  const response = await fetch(callback)
+  assert.equal(response.status, 400)
+  const page = await response.text()
+  assert.match(page, /Connected Web login not completed/)
+  assert.doesNotMatch(page, /Your authentication was successful|same account/)
+  await rejected
+})

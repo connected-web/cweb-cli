@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import http from 'node:http'
 import fs from 'node:fs'
 import { spawn } from 'node:child_process'
-import { loginSuccessPage } from './browser-page.js'
+import { loginPage } from './browser-page.js'
 
 export function openBrowser (url) {
   let wsl = false
@@ -17,7 +17,7 @@ export function openBrowser (url) {
   child.unref()
 }
 
-export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = false, port = 12025, timeout = 180000, open = openBrowser }) {
+export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = false, noBrowser = false, port = 12025, timeout = 180000, open = openBrowser, complete = result => result }) {
   const verifier = crypto.randomBytes(32).toString('base64url')
   const state = crypto.randomBytes(24).toString('base64url')
   const logoutState = crypto.randomBytes(24).toString('base64url')
@@ -26,7 +26,7 @@ export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = fals
     let stage = switchAccount ? 'logout' : 'login'
     let timer; let redirectUri; let authorize; let logout
     const cookieName = `cweb-switch-${logoutState.slice(0, 12)}`
-    const server = http.createServer((req, res) => {
+    const server = http.createServer(async (req, res) => {
       const url = new URL(req.url, 'http://localhost')
       if (stage === 'complete') { res.writeHead(410).end(); return }
       if (stage === 'logout' && url.pathname === '/start-switch') {
@@ -50,21 +50,29 @@ export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = fals
       }
       if (url.searchParams.get('state') !== state) { res.writeHead(400).end('Invalid sign-in state.'); return }
       if (url.searchParams.has('error')) {
-        stage = 'complete'
-        const error = new Error(`Sign-in failed: ${url.searchParams.get('error')}`)
-        res.writeHead(400, { connection: 'close' }).end('Sign-in was not completed.', () => finish(error))
-        return
+        return respond(res, new Error(`Sign-in failed: ${url.searchParams.get('error')}`))
       }
       const code = url.searchParams.get('code')
       if (!code) { res.writeHead(400).end('Missing sign-in code.'); return }
       stage = 'complete'
-      res.writeHead(200, {
+      clearTimeout(timer)
+      try {
+        const result = await complete({ code, verifier, redirectUri })
+        respond(res, null, result)
+      } catch (error) {
+        respond(res, error)
+      }
+    })
+    function respond (res, error, result) {
+      stage = 'complete'
+      if (res.destroyed) { finish(error, result); return }
+      res.writeHead(error ? 400 : 200, {
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-store',
         'referrer-policy': 'no-referrer',
         connection: 'close'
-      }).end(loginSuccessPage, () => finish(null, { code, verifier, redirectUri }))
-    })
+      }).end(loginPage(!error), () => finish(error, result))
+    }
     function finish (error, result) {
       clearTimeout(timer); server.close()
       // A browser preconnection with no request can outlive server.close().
@@ -87,8 +95,12 @@ export function browserLogin ({ oauthUrl, clientId, scopes, switchAccount = fals
         start.search = new URLSearchParams({ state: logoutState }).toString()
       }
       timer = setTimeout(() => finish(new Error(`Timed out waiting for sign-in. Check that ${redirectUri} is an allowed callback${switchAccount ? ' and sign-out URL' : ''}, then run cweb login again.`)), timeout)
-      process.stderr.write(`Opening ${switchAccount ? 'account switch' : 'sign-in'} in your browser.\n`)
-      try { open(start.toString()) } catch (error) { finish(error) }
+      if (noBrowser) {
+        process.stderr.write(`Open this address in a fresh private browser window:\n${start}\n`)
+      } else {
+        process.stderr.write(`Opening ${switchAccount ? 'account switch' : 'sign-in'} in your browser.\n`)
+        try { open(start.toString()) } catch (error) { finish(error) }
+      }
     })
   })
 }

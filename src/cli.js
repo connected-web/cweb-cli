@@ -22,7 +22,7 @@ Usage: cweb [-p PROFILE] <command> [options]
   help                  Show this help
 
 Apps: ${Object.keys(plugins).join(', ')}
-Sign-in options: -p/--profile NAME, --environment global|dev, --port NUMBER
+Sign-in options: -p/--profile NAME, --environment global|dev, --port NUMBER, --no-browser
 Output: whoami and plugins support --json. App output follows the app's CLI.
 Engineering commands have moved to cweb-eng.\n`
 function value (args, i) {
@@ -48,7 +48,7 @@ export function commandLine (args) {
 }
 function coreOptions (args) {
   const options = {}
-  const booleans = new Set(['--interactive', '--browser', '--user', '--switch-account', '--get-access-token', '--json'])
+  const booleans = new Set(['--interactive', '--browser', '--no-browser', '--user', '--switch-account', '--get-access-token', '--json'])
   const values = new Set(['-p', '--profile', '--environment', '--port'])
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
