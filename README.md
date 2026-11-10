@@ -17,8 +17,9 @@ cweb tasks workspaces
 cweb tasks list personal/default --json
 ```
 
-The current public release is a candidate under `next`. App packages are being
-prepared for npmjs.org; check their availability before relying on `cweb install`.
+The current public release is a candidate under `next`. All seven app packages
+are available on npmjs.org. You can install them without organisation registry
+credentials.
 
 New profiles use Global's deployed sign-in configuration. Use a separate profile
 for development:
@@ -78,6 +79,40 @@ app command overrides it. App arguments, help and exit codes are preserved.
 cweb -p my-profile tasks list personal/default --all --json
 cweb -p my-profile curl --user -sS https://tasks-api.global.connected-web.services/status
 ```
+
+### Try Files, Notes and Tasks
+
+Use a workspace where you can create and remove test records. Run
+`cweb tasks workspaces` to find its alias and substitute it for `personal/default`
+in these commands. Prepare a small `sample.txt` file and a `sample.md` file
+starting with a Markdown title such as `# My test record`.
+
+```sh
+cweb files list personal/default
+cweb files upload personal/default sample.txt --content-type text/plain --dry-run
+cweb notes list personal/default
+cweb notes create personal/default --from-markdown sample.md --dry-run
+cweb tasks list personal/default --json
+cweb tasks create personal/default --from-markdown sample.md --dry-run
+```
+
+Review the previews, then repeat each write without `--dry-run`. Use the ID
+returned by each create command in place of `FILE_ID`, `NOTE_ID`, or `TASK_ID`.
+For Files, choose a download path that does not already exist.
+
+```sh
+cweb files download FILE_ID personal/default --out downloaded.txt
+cweb notes get NOTE_ID personal/default --format markdown
+cweb tasks get TASK_ID personal/default --json
+```
+
+For updates and cleanup, see the public package guides for
+[Files](https://www.npmjs.com/package/@connected-web/cweb-files),
+[Notes](https://www.npmjs.com/package/@connected-web/cweb-notes), and
+[Tasks](https://www.npmjs.com/package/@connected-web/cweb-tasks). Use the IDs of
+the test records you created.
+
+### API requests and profiles
 
 `cweb curl` retains the request interface used by domain tools. Your access token
 is added to the request; stdout belongs to curl. Use only a destination you intend
