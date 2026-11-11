@@ -9,7 +9,7 @@ normal app commands.
 ## Install and sign in
 
 ```sh
-npm install -g @connected-web/cweb@next --registry=https://registry.npmjs.org --@connected-web:registry=https://registry.npmjs.org
+npm install -g @connected-web/cweb@latest --registry=https://registry.npmjs.org --@connected-web:registry=https://registry.npmjs.org
 cweb login --interactive
 cweb whoami
 cweb install tasks
@@ -17,9 +17,8 @@ cweb tasks workspaces
 cweb tasks list personal/default --json
 ```
 
-The current public release is a candidate under `next`. All seven app packages
-are available on npmjs.org. You can install them without organisation registry
-credentials.
+Stable releases use `latest`, and release candidates use `next`. All seven app
+packages are available on npmjs.org without organisation registry credentials.
 
 New profiles use Global's deployed sign-in configuration. Use a separate profile
 for development:
@@ -134,8 +133,8 @@ Configuration and identity endpoints require HTTPS, except on localhost.
 
 Platform bootstrap, packaging, deployments, provisioning, credentials, release,
 services, logs and account setup belong to `cweb-eng`. Legacy calls forward to
-that executable for the first public major release. Warnings go to stderr; JSON
-stdout and exit codes remain usable. Engineering login/curl flags also forward.
+that executable throughout cweb 2.x. Warnings go to stderr, and JSON stdout and
+exit codes remain usable. Engineering login and curl flags also forward.
 
 ```sh
 npm install -g @connected-web/cweb-eng --@connected-web:registry=https://npm.pkg.github.com
@@ -143,8 +142,9 @@ cweb-eng --help
 ```
 
 Engineering package installation uses your organisation's GitHub Packages access.
-It is independent of public app use. Remove legacy forwarding only in a later
-major release after known callers have migrated.
+It is independent of public app use. The earliest release that can remove legacy
+forwarding is cweb 3.0, after CI workflows, stored scripts and agent tooling have
+migrated and the change has been announced in release notes.
 
 ## Development and release
 

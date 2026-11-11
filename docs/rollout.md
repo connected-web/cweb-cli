@@ -16,7 +16,9 @@
 - [ ] Publish stable from main and update installation docs/skills.
 - [ ] Retain the prior package version for rollback. Profile/cache format stays
       compatible; do not remove user caches during upgrades or rollback.
-- [ ] Announce the later major version that will remove engineering forwarding.
+- [ ] Before removing engineering forwarding in cweb 3.0 or later, verify that
+      CI workflows, stored scripts and agent tooling have migrated to cweb-eng.
+      Announce the removal in release notes.
 
 Related work:
 - [CLI split](https://tasks.connected-web.net/w/connected-web/platform-development/tasks?board=all-work&viewTask=TASK-338)
